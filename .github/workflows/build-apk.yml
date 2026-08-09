@@ -31,14 +31,6 @@ jobs:
       - name: Install bubblewrap
         run: npm install -g @bubblewrap/cli
 
-      - name: Point bubblewrap at the runner's JDK + Android SDK
-        run: |
-          mkdir -p ~/.bubblewrap
-          cat > ~/.bubblewrap/config.json <<EOF
-          {"jdkPath": "$JAVA_HOME", "androidSdkPath": "$ANDROID_HOME"}
-          EOF
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-
       - name: Restore signing keystore (never in the repo)
         working-directory: app
         run: echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > sillo-phone.p12
@@ -48,7 +40,9 @@ jobs:
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASS }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASS }}
-        run: bubblewrap build --skipPwaValidation
+        # first run: bubblewrap offers to fetch its own JDK + Android SDK and
+        # asks to accept the SDK licenses — `yes` answers everything
+        run: yes | bubblewrap build --skipPwaValidation
 
       - name: Rename artifact
         working-directory: app
