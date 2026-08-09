@@ -46,6 +46,8 @@ jobs:
         # never reaches its interactive "regenerate?" prompt (which can't
         # read a pipe).
         run: |
+          # the runner's global SDK vars fight bubblewrap's own SDK — drop them
+          unset ANDROID_HOME ANDROID_SDK_ROOT
           yes | bubblewrap update --skipVersionUpgrade
           bubblewrap build --skipPwaValidation
 
