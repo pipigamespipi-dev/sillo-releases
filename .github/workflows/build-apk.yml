@@ -41,8 +41,13 @@ jobs:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASS }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASS }}
         # first run: bubblewrap offers to fetch its own JDK + Android SDK and
-        # asks to accept the SDK licenses — `yes` answers everything
-        run: yes | bubblewrap build --skipPwaValidation
+        # asks to accept the SDK licenses — `yes` answers those plain prompts.
+        # `update` then generates the Android project + checksum so `build`
+        # never reaches its interactive "regenerate?" prompt (which can't
+        # read a pipe).
+        run: |
+          yes | bubblewrap update --skipVersionUpgrade
+          bubblewrap build --skipPwaValidation
 
       - name: Rename artifact
         working-directory: app
