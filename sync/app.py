@@ -38,6 +38,7 @@ _lock = threading.Lock()
 _queues = {}   # token -> {"phone": [item, ...], "desktop": [item, ...]}
 _photos = {}   # (token, photo_id) -> bytes
 _codes = {}    # code -> (token, expiry_epoch)
+_pulls = {}    # (token, direction) -> last pull epoch (in-memory liveness only)
 
 
 # ---------------------------------------------------------------- persistence
@@ -235,6 +236,7 @@ def pull():
         return _bad()
     acks = set(a for a in request.args.get("ack", "").split(",") if a)
     with _lock:
+        _pulls[(token, to)] = time.time()  # liveness: "the phone pulled just now"
         entry = _queues.get(token)
         if entry is None:
             return jsonify({"items": []})  # unknown token = empty, NOT an error
@@ -245,6 +247,21 @@ def pull():
                 _save()
         items = list(entry[to])  # ... then the current queue returns
     return jsonify({"items": items})
+
+
+@app.get("/api/seen")
+def seen():
+    """When did each side last pull? Powers the desktop's 🟢/🟡/⚪ status dot.
+    In-memory only — after a relay nap it just reads quiet until the next
+    poll, which is the honest answer anyway."""
+    token = request.args.get("token", "")
+    if not _is_str(token):
+        return _bad()
+    with _lock:
+        return jsonify({
+            "phone": _pulls.get((token, "phone")),
+            "desktop": _pulls.get((token, "desktop")),
+        })
 
 
 @app.route("/api/photo", methods=["GET", "POST"])
