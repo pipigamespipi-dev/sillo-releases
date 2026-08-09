@@ -26,7 +26,12 @@ MAX_PHOTO_BYTES = 10 * 1024 * 1024    # 10 MB per photo
 MAX_PENDING_PHOTOS = 5                # pending photos per token
 CODE_TTL = 600                        # pairing code lifetime, seconds
 
+MAX_JSON_BYTES = 256 * 1024           # a push body is tiny; anything else is junk
+MAX_TOKENS = 500                      # bound the mailbox count (junk tokens)
+PULL_TTL = 7 * 24 * 3600              # forget a token nobody has pulled in a week
+
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = MAX_PHOTO_BYTES + 64 * 1024
 
 # Werkzeug's default request log includes the query string (which carries
 # tokens) -- silence it and log method+path+status ourselves.
@@ -95,8 +100,41 @@ def _big():
     return jsonify({"err": "big"}), 413
 
 
+def _busy():
+    """The mailbox is full RIGHT NOW — unlike 'big', this is temporary and the
+    sender must keep the photo and retry (429, never 413)."""
+    return jsonify({"err": "busy"}), 429
+
+
 def _is_str(v, maxlen=200):
     return isinstance(v, str) and 0 < len(v) <= maxlen
+
+
+def _evict_stale():
+    """Bound the mailbox: forget tokens nobody has pulled in a week, and if
+    we're still over the cap drop the quietest ones. Call with _lock held."""
+    now = time.time()
+    if len(_queues) <= MAX_TOKENS:
+        # only tokens that HAVE been pulled and then went quiet for a week.
+        # (Never-pulled tokens are brand-new pairings whose phone hasn't
+        # polled yet — evicting those would delete a mailbox seconds after
+        # the desktop filled it.)
+        dead = [t for t in _queues
+                if max(_pulls.get((t, "phone"), 0),
+                       _pulls.get((t, "desktop"), 0)) > 0
+                and now - max(_pulls.get((t, "phone"), 0),
+                              _pulls.get((t, "desktop"), 0)) > PULL_TTL]
+        for t in dead[:50]:
+            _queues.pop(t, None)
+        return
+    ranked = sorted(_queues, key=lambda t: max(_pulls.get((t, "phone"), 0),
+                                               _pulls.get((t, "desktop"), 0)))
+    for t in ranked[:len(_queues) - MAX_TOKENS]:
+        _queues.pop(t, None)
+        for k in [k for k in _photos if k[0] == t]:
+            del _photos[k]
+        for d in DIRECTIONS:
+            _pulls.pop((t, d), None)
 
 
 def _purge_codes(now):
@@ -212,14 +250,20 @@ def push():
         ):
             return _bad()
     with _lock:
+        _evict_stale()
         q = _queues.setdefault(token, {"phone": [], "desktop": []})[to]
         for it in items:
             item = {"id": it["id"], "kind": it["kind"], "data": it.get("data", {})}
             for i, old in enumerate(q):
                 if old["id"] == item["id"]:
-                    q[i] = item  # dedupe by id: replace in place
+                    # a REPLACED item is a new delivery: give it a fresh
+                    # version so an ack for the copy already in flight can
+                    # never delete the one that just arrived
+                    item["v"] = int(old.get("v", 0)) + 1
+                    q[i] = item
                     break
             else:
+                item["v"] = 0
                 q.append(item)
         if len(q) > MAX_QUEUE:
             del q[: len(q) - MAX_QUEUE]  # drop oldest
@@ -241,7 +285,19 @@ def pull():
         if entry is None:
             return jsonify({"items": []})  # unknown token = empty, NOT an error
         if acks:
-            kept = [it for it in entry[to] if it["id"] not in acks]
+            # an ack may name a version ("id@3"); a bare id still works, but
+            # only clears an item that has NOT been re-pushed since
+            acked = {}
+            for a in acks:
+                aid, _, av = a.partition("@")
+                acked[aid] = int(av) if av.isdigit() else None
+            kept = []
+            for it in entry[to]:
+                want = acked.get(it["id"], "miss")
+                if want == "miss":
+                    kept.append(it)
+                elif want is not None and want != int(it.get("v", 0)):
+                    kept.append(it)          # a newer delivery — keep it
             if len(kept) != len(entry[to]):
                 entry[to] = kept  # acks deleted FIRST ...
                 _save()
@@ -290,7 +346,7 @@ def photo():
         if (token, pid) not in _photos:
             pending = sum(1 for (t, _p) in _photos if t == token)
             if pending >= MAX_PENDING_PHOTOS:
-                return _big()
+                return _busy()      # transient: the desktop drains these
         _photos[(token, pid)] = data
     return jsonify({"ok": True})
 
@@ -320,8 +376,12 @@ def clear():
         entry = _queues.get(token)
         if entry is not None:
             entry[to] = []
-        for key in [k for k in _photos if k[0] == token]:
-            del _photos[key]
+        if to == "desktop":
+            # photos are payloads of phone->desktop items only: clearing the
+            # PHONE queue must not throw away a photo the desktop hasn't
+            # collected yet (that's someone's quest picture)
+            for key in [k for k in _photos if k[0] == token]:
+                del _photos[key]
         _save()
     return jsonify({"ok": True})
 

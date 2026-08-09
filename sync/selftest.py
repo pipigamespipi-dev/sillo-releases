@@ -158,6 +158,12 @@ def main():
     got = jbody(b)
     check("ack deletes first, then returns", st == 200 and [it["id"] for it in got["items"]] == ["e1"], (st, b))
 
+    # a re-pushed item survives an ack aimed at the copy already delivered
+    req("POST", "/api/push", body={"token": T, "to": "phone",
+                                   "items": [{"id": "e1", "kind": "quest", "data": {"v": 2}}]})
+    st, b, _ = req("GET", "/api/pull?token=" + T + "&to=phone&ack=e1@0")
+    check("stale-version ack does NOT delete the re-push",
+          [it["id"] for it in jbody(b)["items"]] == ["e1"], b)
     st, b, _ = req("GET", "/api/pull?token=" + T + "&to=phone")
     check("ack was persisted", jbody(b)["items"][0]["id"] == "e1" and len(jbody(b)["items"]) == 1, b)
 
@@ -192,7 +198,10 @@ def main():
     for pid in ("p2", "p3", "p4", "p5"):
         req("POST", "/api/photo?token=" + T + "&id=" + pid, raw=jpg)
     st, b, _ = req("POST", "/api/photo?token=" + T + "&id=p6", raw=jpg)
-    check("6th pending photo 413", st == 413, (st, b))
+    # the cap is TRANSIENT (the desktop drains it) -> 429, never 413. A 413
+    # tells the phone "this will never work" and it drops the photo.
+    check("6th pending photo 429 busy (not 413)",
+          st == 429 and jbody(b).get("err") == "busy", (st, b))
 
     st, _, _ = req("POST", "/api/photo/del", body={"token": T, "id": "p5"})
     check("photo del ok", st == 200, st)
@@ -211,10 +220,15 @@ def main():
     st, b, _ = req("GET", "/api/pull?token=" + T + "&to=phone")
     check("clear emptied phone queue", jbody(b) == {"items": []}, b)
     st, _, _ = req("GET", "/api/photo?token=" + T + "&id=p1")
-    check("clear dropped photos", st == 404, st)
+    # clearing the PHONE queue must keep photos: they are phone->desktop
+    # payloads the desktop may not have collected yet
+    check("clear(phone) KEEPS pending photos", st == 200, st)
     st, b, _ = req("GET", "/api/pull?token=" + T + "&to=desktop")
     check("clear left desktop queue", [it["id"] for it in jbody(b)["items"]] == ["d1"], b)
 
+    st, b, _ = req("POST", "/api/clear", body={"token": T, "to": "desktop"})
+    st, _, _ = req("GET", "/api/photo?token=" + T + "&id=p1")
+    check("clear(desktop) drops photos", st == 404, st)
     total = _passed + _failed
     print("%d/%d passed" % (_passed, total))
     try:
