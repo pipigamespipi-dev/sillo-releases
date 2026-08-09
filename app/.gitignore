@@ -1,0 +1,6 @@
+﻿sillo-phone.p12
+build/
+*.apk
+*.aab
+android/
+twa-manifest-output.json

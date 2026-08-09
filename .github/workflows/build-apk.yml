@@ -1,0 +1,70 @@
+# Builds the Sillo phone APK (a Trusted Web Activity wrapping
+# paleto.gg/sillo/phone.html) and attaches it to the phone-v1 release.
+# No store involved: trusted users sideload it straight from the release.
+name: build-apk
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "app/**"
+      - ".github/workflows/build-apk.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install bubblewrap
+        run: npm install -g @bubblewrap/cli
+
+      - name: Point bubblewrap at the runner's JDK + Android SDK
+        run: |
+          mkdir -p ~/.bubblewrap
+          cat > ~/.bubblewrap/config.json <<EOF
+          {"jdkPath": "$JAVA_HOME", "androidSdkPath": "$ANDROID_HOME"}
+          EOF
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Restore signing keystore (never in the repo)
+        working-directory: app
+        run: echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > sillo-phone.p12
+
+      - name: Build signed APK
+        working-directory: app
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+        run: bubblewrap build --skipPwaValidation
+
+      - name: Rename artifact
+        working-directory: app
+        run: cp app-release-signed.apk Sillo.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sillo-apk
+          path: app/Sillo.apk
+
+      - name: Attach to the phone-v1 release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view phone-v1 --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 \
+            || gh release create phone-v1 --repo "$GITHUB_REPOSITORY" \
+                 --title "Sillo phone app (Android)" \
+                 --notes "Sideload build of phone Sillo — a Trusted Web Activity of paleto.gg/sillo/phone.html. For trusted users; allow 'unknown apps' once to install."
+          gh release upload phone-v1 app/Sillo.apk --repo "$GITHUB_REPOSITORY" --clobber

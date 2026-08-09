@@ -1,0 +1,43 @@
+{
+  "packageId": "gg.paleto.sillo",
+  "host": "paleto.gg",
+  "name": "Sillo",
+  "launcherName": "Sillo",
+  "display": "standalone",
+  "themeColor": "#1b1d20",
+  "themeColorDark": "#1b1d20",
+  "navigationColor": "#1b1d20",
+  "navigationColorDark": "#1b1d20",
+  "navigationDividerColor": "#1b1d20",
+  "navigationDividerColorDark": "#1b1d20",
+  "backgroundColor": "#1b1d20",
+  "enableNotifications": false,
+  "startUrl": "/sillo/phone.html",
+  "iconUrl": "https://paleto.gg/sillo/icon-512.png",
+  "maskableIconUrl": "https://paleto.gg/sillo/icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./sillo-phone.p12",
+    "alias": "sillo"
+  },
+  "appVersionName": "1.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://paleto.gg/sillo/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": false,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://paleto.gg/sillo/",
+  "minSdkVersion": 21,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": []
+}
