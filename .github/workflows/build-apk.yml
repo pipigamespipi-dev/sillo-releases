@@ -74,5 +74,5 @@ jobs:
           gh release view phone-v1 --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 \
             || gh release create phone-v1 --repo "$GITHUB_REPOSITORY" \
                  --title "Sillo phone app (Android)" \
-                 --notes "Sideload build of phone Sillo — a Trusted Web Activity of paleto.gg/sillo/phone.html. For trusted users; allow 'unknown apps' once to install."
+                 --notes "Sideload build of phone Sillo — a Trusted Web Activity of Sillo's own site. For trusted users; allow 'unknown apps' once to install."
           gh release upload phone-v1 app/Sillo.apk --repo "$GITHUB_REPOSITORY" --clobber

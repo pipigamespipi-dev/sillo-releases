@@ -1,6 +1,6 @@
 {
   "packageId": "gg.paleto.sillo",
-  "host": "paleto.gg",
+  "host": "sillo-web.onrender.com",
   "name": "Sillo",
   "launcherName": "Sillo",
   "display": "standalone",
@@ -12,19 +12,19 @@
   "navigationDividerColorDark": "#1b1d20",
   "backgroundColor": "#1b1d20",
   "enableNotifications": false,
-  "startUrl": "/sillo/phone.html",
-  "iconUrl": "https://paleto.gg/sillo/icon-512.png",
-  "maskableIconUrl": "https://paleto.gg/sillo/icon-512.png",
+  "startUrl": "/phone.html",
+  "iconUrl": "https://sillo-web.onrender.com/icon-512.png",
+  "maskableIconUrl": "https://sillo-web.onrender.com/icon-512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "./sillo-phone.p12",
     "alias": "sillo"
   },
-  "appVersionName": "1.0",
-  "appVersionCode": 1,
+  "appVersionName": "1.1",
+  "appVersionCode": 2,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
-  "webManifestUrl": "https://paleto.gg/sillo/manifest.json",
+  "webManifestUrl": "https://sillo-web.onrender.com/manifest.json",
   "fallbackType": "customtabs",
   "features": {},
   "alphaDependencies": {
@@ -33,11 +33,14 @@
   "enableSiteSettingsShortcut": false,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "fullScopeUrl": "https://paleto.gg/sillo/",
+  "fullScopeUrl": "https://sillo-web.onrender.com/",
   "minSdkVersion": 21,
   "orientation": "portrait",
   "fingerprints": [],
-  "additionalTrustedOrigins": [],
+  "additionalTrustedOrigins": [
+    "https://sillo.paleto.gg",
+    "https://paleto.gg"
+  ],
   "retainedBundles": [],
   "protocolHandlers": []
 }
